@@ -10,6 +10,7 @@ import java.util.HashSet;
 
 import org.h2.api.ErrorCode;
 import org.h2.command.Prepared;
+import org.h2.command.dml.gpu.GMath;
 import org.h2.engine.Database;
 import org.h2.engine.Session;
 import org.h2.expression.Alias;
@@ -88,12 +89,12 @@ public abstract class Query extends Prepared {
      * the results are written to it, and the method returns null. If no target
      * is specified, a new LocalResult is created and returned.
      *
-     * @param limit the limit as specified in the JDBC method call
+     * @param limit  the limit as specified in the JDBC method call
      * @param target the target to write results to
      * @return the result
      */
     protected abstract LocalResult queryWithoutCache(int limit,
-            ResultTarget target);
+                                                     ResultTarget target);
 
     /**
      * Initialize the query.
@@ -166,11 +167,9 @@ public abstract class Query extends Prepared {
     /**
      * Map the columns to the given column resolver.
      *
-     * @param resolver
-     *            the resolver
-     * @param level
-     *            the subquery level (0 is the top level query, 1 is the first
-     *            subquery level)
+     * @param resolver the resolver
+     * @param level    the subquery level (0 is the top level query, 1 is the first
+     *                 subquery level)
      */
     public abstract void mapColumns(ColumnResolver resolver, int level);
 
@@ -179,19 +178,19 @@ public abstract class Query extends Prepared {
      * plan.
      *
      * @param tableFilter the table filter
-     * @param b the new value
+     * @param b           the new value
      */
     public abstract void setEvaluatable(TableFilter tableFilter, boolean b);
 
     /**
      * Add a condition to the query. This is used for views.
      *
-     * @param param the parameter
-     * @param columnId the column index (0 meaning the first column)
+     * @param param          the parameter
+     * @param columnId       the column index (0 meaning the first column)
      * @param comparisonType the comparison type
      */
     public abstract void addGlobalCondition(Parameter param, int columnId,
-            int comparisonType);
+                                            int comparisonType);
 
     /**
      * Check whether adding condition to the query is allowed. This is not
@@ -263,7 +262,7 @@ public abstract class Query extends Prepared {
     }
 
     private boolean sameResultAsLast(Session s, Value[] params,
-            Value[] lastParams, long lastEval) {
+                                     Value[] lastParams, long lastEval) {
         if (!cacheableChecked) {
             long max = getMaxDataModificationId();
             noCache = max == Long.MAX_VALUE;
@@ -312,14 +311,27 @@ public abstract class Query extends Prepared {
     /**
      * Execute the query, writing the result to the target result.
      *
-     * @param limit the maximum number of rows to return
+     * @param limit  the maximum number of rows to return
      * @param target the target result (null will return the result)
      * @return the result set (if the target is not set).
      */
     LocalResult query(int limit, ResultTarget target) {
         fireBeforeSelectTriggers();
+        //GMath.gpuAlloc();
+        if(!noCache){
+            noCache = true;
+        }
+
         if (noCache || !session.getDatabase().getOptimizeReuseResults()) {
-            return queryWithoutCache(limit, target);
+            long startTime = System.currentTimeMillis();
+            LocalResult lr = queryWithoutCache(limit, target);
+            long endTime = System.currentTimeMillis();
+
+            long duration = (endTime - startTime);
+            if(sqlStatement.length() < 100) {
+                System.out.println("Query Time (" + sqlStatement + ") : " + duration);
+            }
+            return lr;
         }
         Value[] params = getParameterValues();
         long now = session.getDatabase().getModificationDataId();
@@ -354,21 +366,21 @@ public abstract class Query extends Prepared {
     /**
      * Initialize the order by list. This call may extend the expressions list.
      *
-     * @param session the session
-     * @param expressions the select list expressions
-     * @param expressionSQL the select list SQL snippets
-     * @param orderList the order by list
-     * @param visible the number of visible columns in the select list
+     * @param session        the session
+     * @param expressions    the select list expressions
+     * @param expressionSQL  the select list SQL snippets
+     * @param orderList      the order by list
+     * @param visible        the number of visible columns in the select list
      * @param mustBeInResult all order by expressions must be in the select list
-     * @param filters the table filters
+     * @param filters        the table filters
      */
     static void initOrder(Session session,
-            ArrayList<Expression> expressions,
-            ArrayList<String> expressionSQL,
-            ArrayList<SelectOrderBy> orderList,
-            int visible,
-            boolean mustBeInResult,
-            ArrayList<TableFilter> filters) {
+                          ArrayList<Expression> expressions,
+                          ArrayList<String> expressionSQL,
+                          ArrayList<SelectOrderBy> orderList,
+                          int visible,
+                          boolean mustBeInResult,
+                          ArrayList<TableFilter> filters) {
         Database db = session.getDatabase();
         for (SelectOrderBy o : orderList) {
             Expression e = o.expression;
@@ -466,12 +478,12 @@ public abstract class Query extends Prepared {
      * Create a {@link SortOrder} object given the list of {@link SelectOrderBy}
      * objects. The expression list is extended if necessary.
      *
-     * @param orderList a list of {@link SelectOrderBy} elements
+     * @param orderList       a list of {@link SelectOrderBy} elements
      * @param expressionCount the number of columns in the query
      * @return the {@link SortOrder} object
      */
     public SortOrder prepareOrder(ArrayList<SelectOrderBy> orderList,
-            int expressionCount) {
+                                  int expressionCount) {
         int size = orderList.size();
         int[] index = new int[size];
         int[] sortType = new int[size];

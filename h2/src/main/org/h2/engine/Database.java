@@ -22,6 +22,7 @@ import org.h2.api.TableEngine;
 import org.h2.command.CommandInterface;
 import org.h2.command.ddl.CreateTableData;
 import org.h2.command.dml.SetTypes;
+import org.h2.command.dml.gpu.GMath;
 import org.h2.constraint.Constraint;
 import org.h2.index.Cursor;
 import org.h2.index.Index;
@@ -1215,6 +1216,7 @@ public class Database implements DataHandler {
      *            hook
      */
     synchronized void close(boolean fromShutdownHook) {
+        //GMath.gpuFree();
         if (closing) {
             return;
         }
