@@ -44,11 +44,21 @@ public class GTableList {
 
         GTable table = tableMap.get(tableName.toUpperCase());
 
+        String operator = operation.substring(0,operation.indexOf("("));
+
         Value value = ValueFloat.get(0.0f);
         if (table != null) {
             GColumn col = table.getColumn(colName.toUpperCase());
             if (col != null) {
-                value = ValueFloat.get(GMath.sum(col.values));
+                switch (operator.toUpperCase()){
+                    case "SUM":
+                        value = ValueFloat.get(GMath.sum(col.values));
+                        break;
+                    case "MAX":
+                        value = ValueFloat.get(GMath.max(col.values));
+                        break;
+                }
+
             }
         }
 

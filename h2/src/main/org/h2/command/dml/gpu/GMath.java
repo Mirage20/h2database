@@ -11,6 +11,8 @@ public class GMath {
 
     private static native float cudaSum(float[] array, int length);
 
+    private static native float cudaMax(float[] array, int length);
+
     //private static native void cudaMemAlloc(long size);
 
     //private static native void cudaMemFree();
@@ -19,6 +21,10 @@ public class GMath {
 
     public static float sum(float[] array) {
         return cudaSum(array, array.length);
+    }
+
+    public static float max(float[] array) {
+        return cudaMax(array, array.length);
     }
 
 //    public static void gpuAlloc() {
